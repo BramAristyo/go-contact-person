@@ -12,9 +12,15 @@ type Contact struct {
 }
 
 type CreateContactRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+	Name  string `json:"name" validate:"required,min=3"`
+	Email string `json:"email" validate:"required,email"`
+	Phone string `json:"phone" validate:"required,e164"`
+}
+
+type UpdateContactRequest struct {
+	Name  string `json:"name" validate:"required,min=3"`
+	Email string `json:"email" validate:"required,email"`
+	Phone string `json:"phone" validate:"required,e164"`
 }
 
 type ContactRepository interface {

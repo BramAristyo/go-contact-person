@@ -17,8 +17,9 @@ func main() {
 	defer db.Close()
 
 	mux := http.NewServeMux()
+	apiMux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		err := json.NewEncoder(w).Encode(map[string]string{
@@ -33,9 +34,15 @@ func main() {
 	})
 
 	contactHandler := handler.NewContactHandler(db)
-	mux.HandleFunc("GET /contacts", contactHandler.Paginate)
-	mux.HandleFunc("GET /contacts/all", contactHandler.GetAll)
-	mux.HandleFunc("GET /contacts/{id}", contactHandler.GetById)
+
+	apiMux.HandleFunc("GET /contacts", contactHandler.Paginate)
+	apiMux.HandleFunc("GET /contacts/all", contactHandler.GetAll)
+	apiMux.HandleFunc("GET /contacts/{id}", contactHandler.GetById)
+	apiMux.HandleFunc("POST /contacts", contactHandler.Store)
+	apiMux.HandleFunc("PUT /contacts/{id}", contactHandler.Update)
+	apiMux.HandleFunc("DELETE /contacts/{id}", contactHandler.Delete)
+
+	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
 
 	// TODO (next steps):
 	// 1. Complete Create, Update, and Delete features for contacts.

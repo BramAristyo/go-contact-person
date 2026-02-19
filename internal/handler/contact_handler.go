@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/BramAristyo/rest-api-contact-person/internal/domain"
 	"github.com/BramAristyo/rest-api-contact-person/pkg/response"
+	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -55,7 +57,7 @@ func (h *ContactHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, "Error iterating contacts", http.StatusInternalServerError)
 		return
 	}
-	response.WriteSucess(w, contacts, "Contacts retrieved successfully", http.StatusOK)
+	response.WriteSuccess(w, contacts, "Contacts retrieved successfully", http.StatusOK)
 }
 
 func (h *ContactHandler) Paginate(w http.ResponseWriter, r *http.Request) {
@@ -114,15 +116,12 @@ func (h *ContactHandler) Paginate(w http.ResponseWriter, r *http.Request) {
 
 	totalPages := (total + int64(limit) - 1) / int64(limit)
 
-	response.WriteSucess(w, response.PaginatedResponse{
-		Data: contacts,
-		Meta: response.PaginationMeta{
-			Page:       page,
-			Limit:      limit,
-			Total:      total,
-			TotalPages: totalPages,
-		},
-	}, "Contacts retrieved successfully", http.StatusOK)
+	response.WritePaginated(w, contacts, response.PaginationMeta{
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	}, http.StatusOK)
 }
 
 func (h *ContactHandler) GetById(w http.ResponseWriter, r *http.Request) {
@@ -154,5 +153,91 @@ func (h *ContactHandler) GetById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteSucess(w, c, "Contact retrieved successfully", http.StatusOK)
+	response.WriteSuccess(w, c, "Contact retrieved successfully", http.StatusOK)
+}
+
+func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
+	var req domain.CreateContactRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(req); err != nil {
+		response.WriteValidationErrors(w, response.FormatValidationError(err), http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	var exists bool
+	err := h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM contacts WHERE email = $1)`, req.Email).Scan(&exists)
+	if err != nil {
+		response.WriteError(w, "Failed to check existing contact", http.StatusInternalServerError)
+		return
+	}
+
+	if exists {
+		response.WriteError(w, "Email already exists", http.StatusConflict)
+		return
+	}
+
+	var newId int
+	err = h.db.QueryRow(ctx, `INSERT INTO contacts (name, email, phone) VALUES ($1, $2, $3) RETURNING id`, req.Name, req.Email, req.Phone).Scan(&newId)
+	if err != nil {
+		response.WriteError(w, "Failed to create contact", http.StatusInternalServerError)
+		return
+	}
+
+	response.WriteSuccess(w, map[string]int{"id": newId}, "Contact created successfully", http.StatusCreated)
+}
+
+func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req domain.UpdateContactRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(req); err != nil {
+		response.WriteValidationErrors(w, response.FormatValidationError(err), http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	result, err := h.db.Exec(ctx, `UPDATE contacts SET name=$1, email=$2, phone=$3 WHERE id=$4`, req.Name, req.Email, req.Phone, id)
+	if err != nil {
+		response.WriteError(w, "Failed to update contact", http.StatusInternalServerError)
+		return
+	}
+
+	if result.RowsAffected() == 0 {
+		response.WriteError(w, "Contact not found", http.StatusNotFound)
+		return
+	}
+
+	response.WriteSuccess(w, nil, "Contact updated successfully", http.StatusOK)
+}
+
+func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	ctx := r.Context()
+
+	result, err := h.db.Exec(ctx, `DELETE FROM contacts WHERE id = $1`, id)
+	if err != nil {
+		response.WriteError(w, "Failed to delete contact", http.StatusInternalServerError)
+		return
+	}
+
+	if result.RowsAffected() == 0 {
+		response.WriteError(w, "Contact not found", http.StatusNotFound)
+		return
+	}
+
+	response.WriteSuccess(w, nil, "Contact deleted successfully", http.StatusOK)
 }

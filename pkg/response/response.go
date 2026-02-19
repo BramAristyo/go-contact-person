@@ -24,11 +24,12 @@ type SuccessResponse struct {
 }
 
 type ErrorResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success bool              `json:"success"`
+	Message string            `json:"message"`
+	Errors  map[string]string `json:"errors,omitempty"`
 }
 
-func WriteSucess(w http.ResponseWriter, data interface{}, message string, statusCode int) {
+func WriteSuccess(w http.ResponseWriter, data interface{}, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
@@ -59,7 +60,23 @@ func WriteError(w http.ResponseWriter, message string, statusCode int) {
 	}
 }
 
-func WritePaginted(w http.ResponseWriter, data interface{}, meta PaginationMeta, statusCode int) {
+func WriteValidationErrors(w http.ResponseWriter, errors map[string]string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	err := json.NewEncoder(w).Encode(ErrorResponse{
+		Success: false,
+		Message: "Validation failed",
+		Errors:  errors,
+	})
+
+	if err != nil {
+		WriteError(w, "Failed to encode validation error response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func WritePaginated(w http.ResponseWriter, data interface{}, meta PaginationMeta, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
