@@ -8,6 +8,7 @@ import (
 	"github.com/BramAristyo/rest-api-contact-person/internal/config"
 	"github.com/BramAristyo/rest-api-contact-person/internal/database"
 	"github.com/BramAristyo/rest-api-contact-person/internal/handler"
+	"github.com/BramAristyo/rest-api-contact-person/internal/middleware"
 )
 
 func main() {
@@ -44,5 +45,5 @@ func main() {
 	// Reminder: Continue from here for next development tasks.
 
 	log.Printf("server running on http://localhost:%v", cfg.AppPort)
-	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, mux))
+	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, middleware.Logger(middleware.Recovery(mux))))
 }

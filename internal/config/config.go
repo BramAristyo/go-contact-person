@@ -13,9 +13,9 @@ type Config struct {
 }
 
 func Load() *Config {
-	err := godotenv.Load("../../.env")
+	err := godotenv.Load(".env")
 	if err != nil {
-		fmt.Println("Error loading .env file, using environment variables")
+		fmt.Println("Error loading .env file, using environment variables: ", err)
 	}
 
 	dbUrl := fmt.Sprintf(
