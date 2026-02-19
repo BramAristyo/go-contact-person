@@ -7,6 +7,7 @@ import (
 
 	"github.com/BramAristyo/rest-api-contact-person/internal/config"
 	"github.com/BramAristyo/rest-api-contact-person/internal/database"
+	"github.com/BramAristyo/rest-api-contact-person/internal/handler"
 )
 
 func main() {
@@ -29,6 +30,12 @@ func main() {
 		}
 
 	})
+
+	contactHandler := handler.NewContactHandler(db)
+	mux.HandleFunc("GET /contacts", contactHandler.Paginate)
+	mux.HandleFunc("GET /contacts/all", contactHandler.GetAll)
+	mux.HandleFunc("GET /contacts/{id}", contactHandler.GetById)
+
 	log.Printf("server running on http://localhost:%v", cfg.AppPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, mux))
 }
