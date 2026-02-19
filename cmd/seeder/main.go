@@ -2,38 +2,28 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 
+	"github.com/BramAristyo/rest-api-contact-person/internal/config"
+	"github.com/BramAristyo/rest-api-contact-person/internal/database"
 	"github.com/go-faker/faker/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var pool *pgxpool.Pool
-var ctx = context.Background()
-
 func main() {
-	var err error
-	pool, err = pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/go_contact_person?sslmode=disable")
+	cfg := config.Load()
+	db := database.Connect(cfg.DatabaseUrl)
+	defer db.Close()
 
-	if err != nil {
-		log.Fatal("Unable to connect Database!")
-	}
-
-	if err := pool.Ping(ctx); err != nil {
-		log.Fatal("Unable to Ping Database!")
-	}
-
-	fmt.Println("Database connected successfully")
-
-	SeedContacts(pool, 1000)
-	SeedGroups(pool)
-	SeedContactGroups(pool)
+	ctx := context.Background()
+	SeedContacts(ctx, db, 5000)
+	SeedGroups(ctx, db)
+	SeedContactGroups(ctx, db)
 }
 
-func SeedContacts(db *pgxpool.Pool, total int) {
+func SeedContacts(ctx context.Context, db *pgxpool.Pool, total int) {
 	batch := &pgx.Batch{}
 
 	for i := 0; i < total; i++ {
@@ -66,7 +56,7 @@ func SeedContacts(db *pgxpool.Pool, total int) {
 
 	log.Printf("%d contacts seeded\n", total)
 }
-func SeedGroups(db *pgxpool.Pool) {
+func SeedGroups(ctx context.Context, db *pgxpool.Pool) {
 	groups := []string{
 		"Family",
 		"Friends",
@@ -111,7 +101,8 @@ func SeedGroups(db *pgxpool.Pool) {
 
 	log.Printf("%d groups seeded\n", len(groups))
 }
-func SeedContactGroups(db *pgxpool.Pool) {
+func SeedContactGroups(ctx context.Context, db *pgxpool.Pool) {
+	// Streaming approach to avoid loading all contact and group ids into memory at once
 	contactRows, err := db.Query(ctx, `SELECT id FROM contacts`)
 	if err != nil {
 		log.Fatal("Error while fetching contacts.")
