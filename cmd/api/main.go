@@ -9,6 +9,7 @@ import (
 	"github.com/BramAristyo/rest-api-contact-person/internal/database"
 	"github.com/BramAristyo/rest-api-contact-person/internal/handler"
 	"github.com/BramAristyo/rest-api-contact-person/internal/middleware"
+	"github.com/go-playground/validator/v10"
 )
 
 func main() {
@@ -33,7 +34,8 @@ func main() {
 
 	})
 
-	contactHandler := handler.NewContactHandler(db)
+	validate := validator.New()
+	contactHandler := handler.NewContactHandler(db, validate)
 
 	apiMux.HandleFunc("GET /contacts", contactHandler.Paginate)
 	apiMux.HandleFunc("GET /contacts/all", contactHandler.GetAll)

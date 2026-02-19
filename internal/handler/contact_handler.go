@@ -14,12 +14,14 @@ import (
 )
 
 type ContactHandler struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	validate *validator.Validate
 }
 
-func NewContactHandler(db *pgxpool.Pool) *ContactHandler {
+func NewContactHandler(db *pgxpool.Pool, validate *validator.Validate) *ContactHandler {
 	return &ContactHandler{
-		db: db,
+		db:       db,
+		validate: validate,
 	}
 }
 
@@ -31,9 +33,13 @@ func (h *ContactHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rows is stream of data from database, we need to close it after we're done to free up resources.
 	defer rows.Close()
 
 	var contacts []domain.Contact
+
+	// Iterate over the rows and scan data into Structs.
+	// Memory efficient for large datasets since it doesn't load everything into memory at once.
 	for rows.Next() {
 		var c domain.Contact
 		err := rows.Scan(
@@ -61,6 +67,7 @@ func (h *ContactHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContactHandler) Paginate(w http.ResponseWriter, r *http.Request) {
+	// Get params and make it int, if error or less than 1, set default value.
 	page, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if err != nil || page < 1 {
 		page = 1
@@ -74,6 +81,7 @@ func (h *ContactHandler) Paginate(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * limit
 
 	ctx := r.Context()
+	// use Query instead of QueryRow since we expect multiple rows, and it returns a Rows object that we can iterate over.
 	rows, err := h.db.Query(ctx, `SELECT id, name, email, phone, created_at, updated_at FROM contacts ORDER BY id LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)
@@ -158,13 +166,14 @@ func (h *ContactHandler) GetById(w http.ResponseWriter, r *http.Request) {
 
 func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateContactRequest
+	// Stream request body and decode into struct, more efficient than read.All and then unmarshal.
+	// data, _ := io.ReadAll(r.Body) is not recommended for large payloads as it loads everything into memory at once, while Decoder can handle it in chunks.
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	validate := validator.New()
-	if err := validate.Struct(req); err != nil {
+	if err := h.validate.Struct(req); err != nil {
 		response.WriteValidationErrors(w, response.FormatValidationError(err), http.StatusBadRequest)
 		return
 	}
@@ -172,6 +181,7 @@ func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var exists bool
+	// use QueryRow to check if email already exists, since we only expect one row (true/false), and it returns a Row object that we can scan directly.
 	err := h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM contacts WHERE email = $1)`, req.Email).Scan(&exists)
 	if err != nil {
 		response.WriteError(w, "Failed to check existing contact", http.StatusInternalServerError)
@@ -202,15 +212,22 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	validate := validator.New()
-	if err := validate.Struct(req); err != nil {
+	if err := h.validate.Struct(req); err != nil {
 		response.WriteValidationErrors(w, response.FormatValidationError(err), http.StatusBadRequest)
 		return
 	}
 
+	// Start a transaction to ensure data integrity during the update process.
 	ctx := r.Context()
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		response.WriteError(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
 
-	result, err := h.db.Exec(ctx, `UPDATE contacts SET name=$1, email=$2, phone=$3 WHERE id=$4`, req.Name, req.Email, req.Phone, id)
+	// using Exec instead of QueryRow since we don't need to return any data, just check affected rows.
+	result, err := tx.Exec(ctx, `UPDATE contacts SET name=$1, email=$2, phone=$3 WHERE id=$4`, req.Name, req.Email, req.Phone, id)
 	if err != nil {
 		response.WriteError(w, "Failed to update contact", http.StatusInternalServerError)
 		return
@@ -218,6 +235,12 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if result.RowsAffected() == 0 {
 		response.WriteError(w, "Contact not found", http.StatusNotFound)
+		return
+	}
+
+	// Commit the transaction after successful update.
+	if err := tx.Commit(ctx); err != nil {
+		response.WriteError(w, "Failed to commit transaction", http.StatusInternalServerError)
 		return
 	}
 

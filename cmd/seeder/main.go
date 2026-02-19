@@ -24,6 +24,7 @@ func main() {
 }
 
 func SeedContacts(ctx context.Context, db *pgxpool.Pool, total int) {
+	// Using Batch for bulk insert is more efficient than inserting one by one,
 	batch := &pgx.Batch{}
 
 	for i := 0; i < total; i++ {
@@ -31,6 +32,7 @@ func SeedContacts(ctx context.Context, db *pgxpool.Pool, total int) {
 		email := faker.Email()
 		phone := faker.Phonenumber()
 
+		// insert into batch
 		batch.Queue(
 			`INSERT INTO contacts (name, email, phone) 
              VALUES ($1, $2, $3) 
@@ -39,6 +41,7 @@ func SeedContacts(ctx context.Context, db *pgxpool.Pool, total int) {
 		)
 	}
 
+	// Send the batch to the database, it returns a BatchResults which we can iterate over to get results of each query.
 	br := db.SendBatch(ctx, batch)
 	defer func(br pgx.BatchResults) {
 		err := br.Close()
@@ -47,6 +50,7 @@ func SeedContacts(ctx context.Context, db *pgxpool.Pool, total int) {
 		}
 	}(br)
 
+	// We should check the result of each query in the batch, since some might fail due to unique constraint on email, we can log and skip those without failing the whole batch.
 	for i := 0; i < total; i++ {
 		_, err := br.Exec()
 		if err != nil {
@@ -89,7 +93,7 @@ func SeedGroups(ctx context.Context, db *pgxpool.Pool) {
 	defer func(br pgx.BatchResults) {
 		err := br.Close()
 		if err != nil {
-
+			log.Fatal("Batch Closed error:", err)
 		}
 	}(br)
 
@@ -113,7 +117,7 @@ func SeedContactGroups(ctx context.Context, db *pgxpool.Pool) {
 	for contactRows.Next() {
 		var id int64
 		if err := contactRows.Scan(&id); err != nil {
-			return
+			log.Fatal("Error scanning contact id:", err)
 		}
 		contactIds = append(contactIds, id)
 	}
@@ -128,7 +132,7 @@ func SeedContactGroups(ctx context.Context, db *pgxpool.Pool) {
 	for groupRows.Next() {
 		var id int64
 		if err := groupRows.Scan(&id); err != nil {
-			return
+			log.Fatal("Error scanning group id:", err)
 		}
 		groupIds = append(groupIds, id)
 	}
