@@ -36,6 +36,13 @@ func main() {
 	mux.HandleFunc("GET /contacts/all", contactHandler.GetAll)
 	mux.HandleFunc("GET /contacts/{id}", contactHandler.GetById)
 
+	// TODO (next steps):
+	// 1. Complete Create, Update, and Delete features for contacts.
+	// 2. Refactor: Separate logic into service and repository layers.
+	// 3. Implement Logging middleware (step 1).
+	//
+	// Reminder: Continue from here for next development tasks.
+
 	log.Printf("server running on http://localhost:%v", cfg.AppPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, mux))
 }
