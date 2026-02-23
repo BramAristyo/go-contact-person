@@ -35,6 +35,7 @@ func main() {
 	})
 
 	validate := validator.New()
+
 	contactHandler := handler.NewContactHandler(db, validate)
 
 	apiMux.HandleFunc("GET /contacts", contactHandler.Paginate)
@@ -47,11 +48,11 @@ func main() {
 	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
 
 	// TODO (next steps):
-	// 1. Complete Create, Update, and Delete features for contacts.
+	// 1. Complete Create, Update, and Delete features for contacts. Done
 	// 2. Refactor: Separate logic into service and repository layers.
-	// 3. Implement Logging middleware (step 1).
-	//
-	// Reminder: Continue from here for next development tasks.
+	// 3. Implement Logging middleware (step 1). Done
+	// 4. Implement Recovery middleware (step 2). Done
+	// 5. Implement Unit tests for handlers, services, and repositories. and Integration tests for API endpoints.
 
 	log.Printf("server running on http://localhost:%v", cfg.AppPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, middleware.Logger(middleware.Recovery(mux))))

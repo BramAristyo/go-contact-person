@@ -25,8 +25,18 @@ type UpdateContactRequest struct {
 
 type ContactRepository interface {
 	GetAll() ([]Contact, error)
+	Paginate(page int, limit int) ([]Contact, int64, error)
+	GetById(id int) (*Contact, error)
+	Create(contact *Contact) (*Contact, error)
+	Update(id int, contact *Contact) (*Contact, error)
+	Delete(id int) error
 }
 
 type ContactService interface {
 	GetAll() ([]Contact, error)
+	Paginate(page int, limit int) ([]Contact, int64, error)
+	GetById(id int) (*Contact, error)
+	Create(req *CreateContactRequest) (*Contact, error)
+	Update(id int, req *UpdateContactRequest) (*Contact, error)
+	Delete(id int) error
 }
