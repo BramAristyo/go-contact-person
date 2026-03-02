@@ -16,17 +16,24 @@ import (
 type ContactHandler struct {
 	db       *pgxpool.Pool
 	validate *validator.Validate
+	service  domain.ContactService
 }
 
-func NewContactHandler(db *pgxpool.Pool, validate *validator.Validate) *ContactHandler {
+func NewContactHandler(db *pgxpool.Pool, validate *validator.Validate, service domain.ContactService) *ContactHandler {
 	return &ContactHandler{
 		db:       db,
 		validate: validate,
+		service:  service,
 	}
 }
 
 func (h *ContactHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	contacts, err := h.service.GetAll(ctx)
+	if err != nil {
+		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)
+		return
+	}
 	rows, err := h.db.Query(ctx, `SELECT id, name, email, phone, created_at, updated_at FROM contacts`)
 	if err != nil {
 		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)

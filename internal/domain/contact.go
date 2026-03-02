@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Contact struct {
 	Id        int       `json:"id"`
@@ -24,7 +27,7 @@ type UpdateContactRequest struct {
 }
 
 type ContactRepository interface {
-	GetAll() ([]Contact, error)
+	GetAll(ctx context.Context) ([]Contact, error)
 	Paginate(page int, limit int) ([]Contact, int64, error)
 	GetById(id int) (*Contact, error)
 	Create(contact *Contact) (*Contact, error)
@@ -33,7 +36,7 @@ type ContactRepository interface {
 }
 
 type ContactService interface {
-	GetAll() ([]Contact, error)
+	GetAll(ctx context.Context) ([]Contact, error)
 	Paginate(page int, limit int) ([]Contact, int64, error)
 	GetById(id int) (*Contact, error)
 	Create(req *CreateContactRequest) (*Contact, error)

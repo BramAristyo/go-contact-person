@@ -1,6 +1,10 @@
 package services
 
-import "github.com/BramAristyo/rest-api-contact-person/internal/domain"
+import (
+	"context"
+
+	"github.com/BramAristyo/rest-api-contact-person/internal/domain"
+)
 
 type contactService struct {
 	repository domain.ContactRepository
@@ -12,9 +16,8 @@ func NewContactService(repository domain.ContactRepository) domain.ContactServic
 	}
 }
 
-func (c contactService) GetAll() ([]domain.Contact, error) {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) GetAll(ctx context.Context) ([]domain.Contact, error) {
+	return c.repository.GetAll(ctx)
 }
 
 func (c contactService) Paginate(page int, limit int) ([]domain.Contact, int64, error) {
