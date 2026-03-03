@@ -30,7 +30,7 @@ type ContactRepository interface {
 	GetAll(ctx context.Context) ([]Contact, error)
 	Paginate(ctx context.Context, page int, limit int) ([]Contact, int64, error)
 	GetById(ctx context.Context, id int) (*Contact, error)
-	Create(ctx context.Context, contact *Contact) (*Contact, error)
+	Store(ctx context.Context, contact *Contact) (*Contact, error)
 	Update(ctx context.Context, id int, contact *Contact) (*Contact, error)
 	Delete(ctx context.Context, id int) error
 }
@@ -39,7 +39,7 @@ type ContactService interface {
 	GetAll(ctx context.Context) ([]Contact, error)
 	Paginate(ctx context.Context, page int, limit int) ([]Contact, int64, error)
 	GetById(ctx context.Context, id int) (*Contact, error)
-	Create(ctx context.Context, req *CreateContactRequest) (*Contact, error)
+	Store(ctx context.Context, req *CreateContactRequest) (*Contact, error)
 	Update(ctx context.Context, id int, req *UpdateContactRequest) (*Contact, error)
 	Delete(ctx context.Context, id int) error
 }

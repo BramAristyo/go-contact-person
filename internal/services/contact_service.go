@@ -28,8 +28,8 @@ func (c contactService) GetById(ctx context.Context, id int) (*domain.Contact, e
 	return c.repository.GetById(ctx, id)
 }
 
-func (c contactService) Create(ctx context.Context, req *domain.CreateContactRequest) (*domain.Contact, error) {
-	return c.repository.Create(ctx, &domain.Contact{
+func (c contactService) Store(ctx context.Context, req *domain.CreateContactRequest) (*domain.Contact, error) {
+	return c.repository.Store(ctx, &domain.Contact{
 		Name:  req.Name,
 		Email: req.Email,
 		Phone: req.Phone,

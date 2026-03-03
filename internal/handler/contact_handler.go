@@ -83,6 +83,7 @@ func (h *ContactHandler) GetById(w http.ResponseWriter, r *http.Request) {
 
 func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateContactRequest
+
 	// Stream request body and decode into struct, more efficient than read.All and then unmarshal.
 	// data, _ := io.ReadAll(r.Body) is not recommended for large payloads as it loads everything into memory at once, while Decoder can handle it in chunks.
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -95,29 +96,12 @@ func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
-
-	var exists bool
-	// use QueryRow to check if email already exists, since we only expect one row (true/false), and it returns a Row object that we can scan directly.
-	err := h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM contacts WHERE email = $1)`, req.Email).Scan(&exists)
+	contact, err := h.service.Store(r.Context(), &req)
 	if err != nil {
-		response.WriteError(w, "Failed to check existing contact", http.StatusInternalServerError)
-		return
+		response.WriteError(w, "Error while create contact", http.StatusInternalServerError)
 	}
 
-	if exists {
-		response.WriteError(w, "Email already exists", http.StatusConflict)
-		return
-	}
-
-	var newId int
-	err = h.db.QueryRow(ctx, `INSERT INTO contacts (name, email, phone) VALUES ($1, $2, $3) RETURNING id`, req.Name, req.Email, req.Phone).Scan(&newId)
-	if err != nil {
-		response.WriteError(w, "Failed to create contact", http.StatusInternalServerError)
-		return
-	}
-
-	response.WriteSuccess(w, map[string]int{"id": newId}, "Contact created successfully", http.StatusCreated)
+	response.WriteSuccess(w, map[string]int{"id": contact.Id}, "Contact created successfully", http.StatusCreated)
 }
 
 func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -134,48 +118,30 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start a transaction to ensure data integrity during the update process.
-	ctx := r.Context()
-	tx, err := h.db.Begin(ctx)
+	idInt, err := strconv.Atoi(id)
 	if err != nil {
-		response.WriteError(w, "Failed to start transaction", http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback(ctx)
-
-	// using Exec instead of QueryRow since we don't need to return any data, just check affected rows.
-	result, err := tx.Exec(ctx, `UPDATE contacts SET name=$1, email=$2, phone=$3 WHERE id=$4`, req.Name, req.Email, req.Phone, id)
-	if err != nil {
-		response.WriteError(w, "Failed to update contact", http.StatusInternalServerError)
+		response.WriteError(w, "Invalid contact ID", http.StatusBadRequest)
 		return
 	}
 
-	if result.RowsAffected() == 0 {
-		response.WriteError(w, "Contact not found", http.StatusNotFound)
-		return
-	}
+	contact, err := h.service.Update(r.Context(), idInt, &req)
 
-	// Commit the transaction after successful update.
-	if err := tx.Commit(ctx); err != nil {
-		response.WriteError(w, "Failed to commit transaction", http.StatusInternalServerError)
-		return
-	}
-
-	response.WriteSuccess(w, nil, "Contact updated successfully", http.StatusOK)
+	response.WriteSuccess(w, contact, "Contact updated successfully", http.StatusOK)
 }
 
 func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	ctx := r.Context()
 
-	result, err := h.db.Exec(ctx, `DELETE FROM contacts WHERE id = $1`, id)
+	idInt, err := strconv.Atoi(id)
 	if err != nil {
-		response.WriteError(w, "Failed to delete contact", http.StatusInternalServerError)
+		response.WriteError(w, "Error while parse string to Int", http.StatusBadRequest)
 		return
 	}
 
-	if result.RowsAffected() == 0 {
-		response.WriteError(w, "Contact not found", http.StatusNotFound)
+	err = h.service.Delete(r.Context(), idInt)
+
+	if err != nil {
+		response.WriteError(w, "Error while delete contact", http.StatusInternalServerError)
 		return
 	}
 
