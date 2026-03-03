@@ -20,27 +20,34 @@ func (c contactService) GetAll(ctx context.Context) ([]domain.Contact, error) {
 	return c.repository.GetAll(ctx)
 }
 
-func (c contactService) Paginate(page int, limit int) ([]domain.Contact, int64, error) {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) Paginate(ctx context.Context, page int, limit int) ([]domain.Contact, int64, error) {
+	return c.repository.Paginate(ctx, page, limit)
 }
 
-func (c contactService) GetById(id int) (*domain.Contact, error) {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) GetById(ctx context.Context, id int) (*domain.Contact, error) {
+	return c.repository.GetById(ctx, id)
 }
 
-func (c contactService) Create(req *domain.CreateContactRequest) (*domain.Contact, error) {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) Create(ctx context.Context, req *domain.CreateContactRequest) (*domain.Contact, error) {
+	return c.repository.Create(ctx, &domain.Contact{
+		Name:  req.Name,
+		Email: req.Email,
+		Phone: req.Phone,
+	})
 }
 
-func (c contactService) Update(id int, req *domain.UpdateContactRequest) (*domain.Contact, error) {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) Update(ctx context.Context, id int, req *domain.UpdateContactRequest) (*domain.Contact, error) {
+	return c.repository.Update(ctx, id, &domain.Contact{
+		Id:    id,
+		Name:  req.Name,
+		Email: req.Email,
+		Phone: req.Phone,
+	})
 }
 
-func (c contactService) Delete(id int) error {
-	//TODO implement me
-	panic("implement me")
+func (c contactService) Delete(ctx context.Context, id int) error {
+	if err := c.repository.Delete(ctx, id); err != nil {
+		return err
+	}
+	return nil
 }

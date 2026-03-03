@@ -2,14 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/BramAristyo/rest-api-contact-person/internal/domain"
 	"github.com/BramAristyo/rest-api-contact-person/pkg/response"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,46 +28,12 @@ func NewContactHandler(db *pgxpool.Pool, validate *validator.Validate, service d
 func (h *ContactHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	contacts, err := h.service.GetAll(ctx)
+
 	if err != nil {
-		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)
-		return
-	}
-	rows, err := h.db.Query(ctx, `SELECT id, name, email, phone, created_at, updated_at FROM contacts`)
-	if err != nil {
-		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)
-		return
-	}
-
-	// Rows is stream of data from database, we need to close it after we're done to free up resources.
-	defer rows.Close()
-
-	var contacts []domain.Contact
-
-	// Iterate over the rows and scan data into Structs.
-	// Memory efficient for large datasets since it doesn't load everything into memory at once.
-	for rows.Next() {
-		var c domain.Contact
-		err := rows.Scan(
-			&c.Id,
-			&c.Name,
-			&c.Email,
-			&c.Phone,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		)
-
-		if err != nil {
-			response.WriteError(w, "Failed to parse contact data", http.StatusInternalServerError)
-			return
-		}
-
-		contacts = append(contacts, c)
-	}
-
-	if rows.Err() != nil {
 		response.WriteError(w, "Error iterating contacts", http.StatusInternalServerError)
 		return
 	}
+
 	response.WriteSuccess(w, contacts, "Contacts retrieved successfully", http.StatusOK)
 }
 
@@ -85,49 +49,9 @@ func (h *ContactHandler) Paginate(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	offset := (page - 1) * limit
-
 	ctx := r.Context()
-	// use Query instead of QueryRow since we expect multiple rows, and it returns a Rows object that we can iterate over.
-	rows, err := h.db.Query(ctx, `SELECT id, name, email, phone, created_at, updated_at FROM contacts ORDER BY id LIMIT $1 OFFSET $2`, limit, offset)
-	if err != nil {
-		response.WriteError(w, "Failed to fetch contacts", http.StatusInternalServerError)
-		return
-	}
 
-	defer rows.Close()
-
-	var contacts []domain.Contact
-	for rows.Next() {
-		var c domain.Contact
-		err := rows.Scan(
-			&c.Id,
-			&c.Name,
-			&c.Email,
-			&c.Phone,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		)
-
-		if err != nil {
-			response.WriteError(w, "Failed to parse contact data", http.StatusInternalServerError)
-			return
-		}
-
-		contacts = append(contacts, c)
-	}
-
-	if rows.Err() != nil {
-		response.WriteError(w, "Error iterating contacts", http.StatusInternalServerError)
-		return
-	}
-
-	var total int64
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM contacts`).Scan(&total)
-	if err != nil {
-		response.WriteError(w, "Failed to count contacts", http.StatusInternalServerError)
-		return
-	}
+	contacts, total, err := h.service.Paginate(ctx, page, limit)
 
 	totalPages := (total + int64(limit) - 1) / int64(limit)
 
@@ -147,28 +71,14 @@ func (h *ContactHandler) GetById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var c domain.Contact
 
-	err = h.db.QueryRow(ctx, `SELECT id, name, email, phone, created_at, updated_at FROM contacts WHERE id = $1`, id).Scan(
-		&c.Id,
-		&c.Name,
-		&c.Email,
-		&c.Phone,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-	)
-
+	contact, err := h.service.GetById(ctx, id)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			response.WriteError(w, "Contact not found", http.StatusNotFound)
-			return
-		}
-
-		response.WriteError(w, "Failed to fetch contact", http.StatusInternalServerError)
+		response.WriteError(w, "Error get contact", http.StatusInternalServerError)
 		return
 	}
 
-	response.WriteSuccess(w, c, "Contact retrieved successfully", http.StatusOK)
+	response.WriteSuccess(w, contact, "Contact retrieved successfully", http.StatusOK)
 }
 
 func (h *ContactHandler) Store(w http.ResponseWriter, r *http.Request) {
